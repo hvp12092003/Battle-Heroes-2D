@@ -1,4 +1,5 @@
-﻿using Photon.Pun;
+﻿using HVPUnityBase.Base.DesignPattern;
+using Photon.Pun;
 using Photon.Realtime;
 using System;
 using System.Collections.Generic;
@@ -17,10 +18,7 @@ public class PhontonRoom : MonoBehaviourPunCallbacks
     public List<RoomInfo> updateRooms;
     public List<RoomProfile> rooms = new List<RoomProfile>();
 
-    // Start is called before the first frame update
-    void Start()
-    {
-    }
+
     public void CreateRoom()
     {
         string name = inputRoomName.text;
@@ -38,9 +36,7 @@ public class PhontonRoom : MonoBehaviourPunCallbacks
     public void LeftRoom()
     {
         PhotonNetwork.LeaveRoom();
-        PhotonNetwork.LoadLevel("MenuLogin");
     }
-
     public override void OnRoomListUpdate(List<RoomInfo> roomList)
     {
 
@@ -129,16 +125,47 @@ public class PhontonRoom : MonoBehaviourPunCallbacks
     {
         Debug.Log("OnCreatedRoom");
     }
+    void GetOtherPlayerNames()
+    {
+        foreach (Player player in PhotonNetwork.PlayerListOthers)
+        {
+            Debug.Log("Other Player Name: " + player.NickName);
+        }
+    }
     public override void OnJoinedRoom()
     {
         Debug.Log("OnJoinedRoom " + PhotonNetwork.CurrentRoom.Name);
+        Observer.Instance.Notify("UpdateTextArenaRoomName", PhotonNetwork.CurrentRoom.Name);
 
-        //PhotonNetwork.LoadLevel("Room1");
-        // PhotonNetwork.LoadLevel("GamePlay");
+        if (!PhotonNetwork.IsMasterClient)
+        {
+            //send data for master
+            EVENTCTL.Instance.SendInformationToOther();
+        }
+    }
+    public override void OnPlayerEnteredRoom(Player newPlayer)
+    {
+        if (PhotonNetwork.IsMasterClient)
+        {
+            Debug.Log("Send");
+            //send data for client
+            EVENTCTL.Instance.SendInformationToOther();
+        }
     }
     public override void OnLeftRoom()
     {
         Debug.Log("OnLeftRoom");
+        Observer.Instance.Notify("ResetRoomName");
+        Observer.Instance.Notify("ResetNameP2");
+        Observer.Instance.Notify("ResetImageBarrackP2");
+        Observer.Instance.Notify("ResetIconHeroesP2");
+    }
+    public override void OnPlayerLeftRoom(Player otherPlayer)
+    {
+        Debug.Log($"Player {otherPlayer.NickName} has left the room.");
+        Observer.Instance.Notify("ResetImageBarrackP2");
+        Observer.Instance.Notify("ResetNameP2");
+        Observer.Instance.Notify("ResetIconHeroesP2");
     }
     public override void OnCreateRoomFailed(short returnCode, string message)
     {

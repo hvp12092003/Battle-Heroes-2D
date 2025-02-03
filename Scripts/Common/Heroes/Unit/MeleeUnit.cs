@@ -1,12 +1,12 @@
-﻿using System.Collections;
-using System.Collections.Generic;
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEngine.UIElements;
 using GameNamespace;
 using Photon.Pun;
+
 public class MeleeUnit : HeroController
 {
-
+    public float attackRange;
+    public BarrackController barrackScripts;
     // Start is called before the first frame update
     private void Start()
     {
@@ -17,116 +17,107 @@ public class MeleeUnit : HeroController
         animator = this.GetComponent<Animator>();
         stateInfo = animator.GetCurrentAnimatorStateInfo(0);
         box = this.GetComponent<BoxCollider2D>();
-        box.isTrigger = true;
+        rigidbody2 = this.GetComponent<Rigidbody2D>();
+        rigidbody2.bodyType = RigidbodyType2D.Dynamic;
+        rigidbody2.gravityScale = 0;
         SetDirection();
     }
+
     // Update is called once per frame
     private void Update()
     {
         CountEffect();
         UpdateStatus();
         ShowAttributeHeroes();
+        CheckEnemyAndAlly();
     }
+
     protected virtual void GiveDamage()
     {
         if (enemyOBJ != null)
         {
-            if (enemyOBJ == null || !photonView.IsMine) return;
-            if (meleeUnitScrip != null)
+            if (meleeEnemyUnitScrip != null)
             {
-                PhotonView enemyPhotonView = enemyOBJ.GetComponentInChildren<PhotonView>();
-                enemyPhotonView.RPC("TakeDamage", RpcTarget.All, this.heroAttribute.baseDamage, this.typeDamage, this.heroAttribute.baseTimeEffect);
+                meleeEnemyUnitScrip.TakeDamage(this.heroAttribute.baseDamage, this.typeDamage, this.heroAttribute.baseTimeEffect);
             }
             else
             {
-                PhotonView enemyPhotonView = enemyOBJ.GetComponentInChildren<PhotonView>();
-                enemyPhotonView.RPC("TakeDamage", RpcTarget.All, this.heroAttribute.baseDamage, this.typeDamage, this.heroAttribute.baseTimeEffect);
+                rangedEnemyUnitScrip.TakeDamage(this.heroAttribute.baseDamage, this.typeDamage, this.heroAttribute.baseTimeEffect);
             }
         }
         else if (barrackEnemyOBJ != null)
         {
-            if (!photonView.IsMine) return;
-            PhotonView barrackPhotonView = barrackEnemyOBJ.GetComponent<PhotonView>();
-            barrackPhotonView.RPC("TakeDamage", RpcTarget.All, this.heroAttribute.baseDamage);
+            barrackScripts = barrackEnemyOBJ.GetComponent<BarrackController>();
+            barrackScripts.TakeDamage(this.heroAttribute.baseDamage);
         }
     }
-    public PhotonView thisPhotonView;
-    // public void OnCollisionEnter2D(Collision2D collision)
+    public void CheckEnemyAndAlly()
+    {
+        if (enemyOBJ != null || barrackEnemyOBJ != null) return;
+        Vector2 rayDirection = (hero.transform.tag == "Left") ? Vector2.right : Vector2.left; // Hướng tia dựa trên "tag"
+        RaycastHit2D[] hits = Physics2D.RaycastAll(this.transform.position, rayDirection, attackRange);
+
+        // not touch ally
+        if (hits.Length == 1) touchAlly = false;
+
+        foreach (RaycastHit2D hit in hits)
+        {
+            if (hit.transform.gameObject == this.gameObject) continue;
+
+            //cast enemyBarrack
+            if (hit.collider.isTrigger) // Kiểm tra có phải trigger hay không
+            {
+                if (!hit.transform.parent.CompareTag(this.hero.tag))
+                {
+                    Debug.Log("cast enemyBarrack");
+                    barrackEnemyOBJ = hit.collider.gameObject;
+                    touchEnemyBarrack = true;
+                    return;
+                }
+            }
+
+            //cast enemy
+            if (!hit.transform.parent.tag.Equals(hero.transform.tag))
+            {
+                Debug.Log("cast enemy");
+
+                enemyOBJ = hit.collider.gameObject;
+                if (enemyOBJ.tag.Equals("Melee")) meleeEnemyUnitScrip = hit.collider.gameObject.GetComponent<MeleeUnit>();
+                else rangedEnemyUnitScrip = hit.collider.gameObject.GetComponent<RangedUnit>();
+
+                touchEnemy = true;
+                return;
+            }
+
+            // touch Ally             
+            if (hit.transform.parent.tag.Equals(hero.transform.tag) && !hit.collider.isTrigger)
+            {
+                Debug.Log("touch Ally ");
+                touchAlly = true;
+                return;
+            }
+        }
+    }
+    void OnDrawGizmosSelected()
+    {
+        if (this.transform.parent.CompareTag("Right"))
+        {
+            Debug.DrawRay(this.transform.position, -transform.right * attackRange, Color.red);
+        }
+        else
+        {
+            Debug.DrawRay(this.transform.position, transform.right * attackRange, Color.red);
+        }
+    }
     private void OnTriggerEnter2D(Collider2D collision)
     {
         //touch bullet
-        if (collision.transform.CompareTag("Bullet") && PhotonNetwork.NetworkClientState.ToString() == "Joined")
+        if (collision.transform.parent.CompareTag("Bullet") && !collision.transform.CompareTag(hero.tag))
         {
-            if (!photonView.IsMine) return;
             BulletHeroController bulletScript = collision.GetComponent<BulletHeroController>();
-            if (bulletScript.dir.ToString() == hero.tag) return;
-            photonView.RPC("TakeDamage", RpcTarget.All, bulletScript.damage, bulletScript.typeD, bulletScript.timeEffect);
-            Destroy(collision.gameObject);
-            return;
-        }
-        else if (collision.transform.CompareTag("Bullet") && PhotonNetwork.NetworkClientState.ToString() != "Joined")
-        {
-            Debug.Log("Touch Bullet");
-            if (!photonView.IsMine) return;
-            BulletHeroController bulletScript = collision.GetComponent<BulletHeroController>();
-            if (bulletScript.dir.ToString() == hero.tag) return;
             TakeDamage(bulletScript.damage, bulletScript.typeD, bulletScript.timeEffect);
-            Destroy(collision.gameObject);
+            Destroy(collision.transform.parent.gameObject);
             return;
         }
-
-        if (touchEnemyBarrack || touchEnemy) return;
-
-        // touch Barrack Enemy
-        if (collision.transform.CompareTag("BarrackLeft") && hero.transform.CompareTag("Right") || collision.transform.CompareTag("BarrackRight") && hero.transform.CompareTag("Left"))
-        {
-            barrackEnemyOBJ = collision.gameObject;
-            touchEnemyBarrack = true;
-            return;
-        }
-        // touch Enemy
-        if (collision.transform.parent.CompareTag("Left") && hero.transform.CompareTag("Right") || collision.transform.parent.CompareTag("Right") && hero.transform.CompareTag("Left"))
-        {
-            enemyOBJ = collision.gameObject;
-            touchEnemy = true;
-            return;
-        }
-
-
-        // touch Ally 
-        if (collision.transform.parent.CompareTag(this.hero.tag))
-        {
-            if (hero.CompareTag("Left"))
-            {
-                if (collision.transform.parent.position.x > this.transform.parent.position.x) touchAlly = true;
-            }
-            else if (hero.CompareTag("Right"))
-            {
-                if (collision.transform.parent.position.x < this.transform.parent.position.x) touchAlly = true;
-            }
-            return;
-        }
-    }
-    // public void OnCollisionExit2D(Collision2D collision)
-    private void OnTriggerExit2D(Collider2D collision)
-    {
-        if (collision.transform.parent == null || touchEnemyBarrack) return;
-
-        //laeve enemy walk
-        if (collision.transform.parent.tag != this.transform.parent.tag)
-        {
-            enemyOBJ = null;
-            meleeUnitScrip = null;
-            rangedUnitScrip = null;
-            touchEnemy = false;
-            touchEnemyBarrack = false;
-        }
-
-        // laeve ally walk
-        if (collision.transform.parent.CompareTag(this.transform.parent.tag))
-        {
-            touchAlly = false;
-        }
-
     }
 }

@@ -2,55 +2,50 @@
 using UnityEngine.Networking;
 using System.Collections;
 using HVPUnityBase.Base.DesignPattern;
-using System.Collections.Generic;
 using System.Text;
-using UnityEngine.UI;
 using GameNamespace;
-using Unity.VisualScripting.Antlr3.Runtime;
-using SimpleJSON;
 public class CallAPI : MonoBehaviour
 {
     public string username;
     public string password;
-    public string jsonBody;
+    public string jsonBodyLogin, jsonBodyPost;
     public string token;
 
     Response response;
-    PostData postData;
+    GameNamespace.UserDataPost postData;
     void Start()
     {
-        postData = new PostData();
+        postData = new GameNamespace.UserDataPost();
         response = new Response();
     }
     public void ButtonRegister()
     {
         ResetData();
         //register
-        StartCoroutine(Regisger("http://localhost:5000/api/register", jsonBody));
+        StartCoroutine(Regisger("http://localhost:5000/api/register", jsonBodyLogin));
     }
     public void ButtonLogin()
     {
         ResetData();
         //login
-        StartCoroutine(Login("http://localhost:5000/api/login", jsonBody));
+        StartCoroutine(Login("http://localhost:5000/api/login", jsonBodyLogin));
     }
     public void ButtonChangeData()
     {
         ResetData();
         //login
-        StartCoroutine(ChangeData("http://localhost:5000/api/patch", jsonBody, token));
+        StartCoroutine(ChangeData("http://localhost:5000/api/patch", jsonBodyLogin, token));
     }
     public void ResetData()
     {
         postData.username = this.username;
         postData.password = this.password;
 
-        // Chuyển đối tượng thành JSON
-        this.jsonBody = JsonUtility.ToJson(postData);
+        this.jsonBodyLogin = JsonUtility.ToJson(postData);
     }
     IEnumerator Login(string url, string jsonBody)
     {
-        Debug.Log("Sending JSON: " + jsonBody); // In payload gửi từ Unity
+        Debug.Log("Sending JSON: " + jsonBody);
 
         UnityWebRequest request = new UnityWebRequest(url, "POST");
         byte[] bodyRaw = Encoding.UTF8.GetBytes(jsonBody);
@@ -65,13 +60,30 @@ public class CallAPI : MonoBehaviour
         {
             Debug.Log("Response: " + request.downloadHandler.text);
             response = JsonUtility.FromJson<Response>(request.downloadHandler.text);
-            token = response.token;
+            if (response != null && response.userDataOn != null)
+            {
+                this.token = response.token;
+                Debug.Log($"Message: {response.message}");
+                Debug.Log($"Token: {response.token}");
+                Debug.Log($"Username: {response.userDataOn.username}");
+                Debug.Log($"NickName: {response.userDataOn.nickName}");
+                Debug.Log($"Coin: {response.userDataOn.coin}");
+                Debug.Log($"PointRank: {response.userDataOn.pointRank}");
+                Debug.Log($"LevelOfHeroes: {string.Join(",", response.userDataOn.levelOfHeroes)}");
+                Debug.Log($"PointOfDungeon: {string.Join(",", response.userDataOn.pointOfDungeon)}");
+            }
+            else
+            {
+                Debug.LogError("Không nhận được dữ liệu người dùng từ API.");
+            }
+
         }
         else
         {
             Debug.LogError("Error: " + request.error);
         }
     }
+
 
     IEnumerator Regisger(string url, string jsonBody)
     {
@@ -95,11 +107,13 @@ public class CallAPI : MonoBehaviour
             Debug.LogError($"Error: {request.error}, Response: {request.downloadHandler.text}");
         }
     }
+
+
     IEnumerator ChangeData(string url, string jsonBody, string token)
     {
 
         UnityWebRequest request = new UnityWebRequest(url, "PATCH");
-        byte[] bodyRaw = Encoding.UTF8.GetBytes(jsonBody);
+        byte[] bodyRaw = Encoding.UTF8.GetBytes(jsonBodyPost);
 
         request.uploadHandler = new UploadHandlerRaw(bodyRaw);
         request.downloadHandler = new DownloadHandlerBuffer();
@@ -118,4 +132,5 @@ public class CallAPI : MonoBehaviour
         }
     }
 }
+
 public class API : SingletonMonoBehaviour<CallAPI> { }

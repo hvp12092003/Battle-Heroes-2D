@@ -14,6 +14,11 @@ public class PhotonStatus : MonoBehaviour
     {
         this.photonStatus = PhotonNetwork.NetworkClientState.ToString();
         this.textStatus.text = photonStatus;
+        Debug.Log(this.photonStatus);
     }
-
+    //Authenticating
+    //ConnectingToMasterServer
+    //OnConnectedToMaster
+    //JoiningLobby
+    //JoinedLobby
 }

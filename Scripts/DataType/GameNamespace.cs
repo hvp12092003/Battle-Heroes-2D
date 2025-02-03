@@ -23,6 +23,7 @@ namespace GameNamespace
     }
     public class HeroAttribute
     {
+        public float coin;
         public float baseHP;
         public float baseDamage;
         public float speed = 2;
@@ -35,6 +36,7 @@ namespace GameNamespace
         public float amountHero;
         public float amountCoinCreatePerSecond;
     }
+
     public class DataLevelBarrack
     {
         public int level;
@@ -57,21 +59,51 @@ namespace GameNamespace
     {
         public float[] pointOfInstance;
     }
-    public class PostData
+    public class UserDataPost
     {
         public string username;
         public string password;
+
     }
-    [System.Serializable]
-    public class LoginResponse
+    //online
+    public class UserDataOn
     {
-        public string token;
-        public string message;
-        public bool success;
+        public string _id;
+        public string username;
+        public string nickName;
+        public int coin;
+        public int pointRank;
+        public int[] levelOfHeroes;
+        public int[] pointOfDungeon;
+    }
+    // offline
+    public class UserDataOff
+    {
+        public int gold;
+        public string account;
+        public string passwold;
+        public string nickName;
+        public int[] heroes;
     }
     public class Response
     {
         public string message;
         public string token;
+        public UserDataOn userDataOn;
+    }
+    public class EventUpdateHP
+    {
+        public string role;
+        public float indexPercentHP;
+    }
+    public enum TypeButtonMainScene
+    {
+        Shop, Heroes, Arena, Map, Option
+    }
+    public class InformationOnJoinedRoom
+    {
+        public string nickName;
+        public int levelBarrack;
+        public int[] heroes;
     }
 }
